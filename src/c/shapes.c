@@ -1,13 +1,115 @@
 #include <pebble.h>
+#include "SmallMaths.h"
 
 static Window *s_window;
+static Layer *bitmap_layer;
+
+static GColor background_color;
+static GColor hour_line_color;
+static GPath *filling_path = NULL;
+
+static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
+  time_t now = time(NULL);
+  struct tm *t = localtime(&now);
+  int minute = (*t).tm_min;
+  int five_minute = (*t).tm_min / 5;
+  int hour = (*t).tm_hour;
+
+  // temp
+  background_color = GColorFromRGBA(255, 255, 255, 255);
+  hour_line_color = GColorFromRGBA(205, 34, 49, 255);
+
+  GRect bounds = layer_get_bounds(layer);
+  GPoint center = grect_center_point(&bounds);
+  int diameter = sm_sqrt(sm_powint(bounds.size.w,2) + sm_powint(bounds.size.h,2));
+
+  // background color
+  graphics_context_set_fill_color(ctx, background_color);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  int32_t hour_angle = TRIG_MAX_ANGLE * (hour % 12) / 12.0;
+  int32_t perpendicular = hour_angle + TRIG_MAX_RATIO / 4;
+
+  graphics_context_set_stroke_width(ctx, 1);
+  graphics_context_set_stroke_color(ctx, hour_line_color);
+  graphics_context_set_antialiased(ctx, true);
+
+  int space = 5;
+
+  for (int shift = -diameter / 2; shift < diameter / 2; shift += space) {
+    int shiftX =   sin_lookup(perpendicular) * shift / TRIG_MAX_RATIO;
+    int shiftY = - cos_lookup(perpendicular) * shift / TRIG_MAX_RATIO;
+
+    GPoint diameterPoint1 = GPoint(
+      center.x + sin_lookup(hour_angle) * (diameter / 2) / TRIG_MAX_RATIO + shiftX,
+      center.y - cos_lookup(hour_angle) * (diameter / 2) / TRIG_MAX_RATIO + shiftY
+    );
+    GPoint diameterPoint2 = GPoint(
+      center.x - sin_lookup(hour_angle) * (diameter / 2) / TRIG_MAX_RATIO + shiftX,
+      center.y + cos_lookup(hour_angle) * (diameter / 2) / TRIG_MAX_RATIO + shiftY
+    );
+
+    graphics_draw_line(ctx, diameterPoint1, diameterPoint2);
+  }
+
+  five_minute = 2;
+  int shape_size = 30;
+
+  if (five_minute == 0) {
+    // draw nothing
+  } else if (five_minute == 1) {
+    graphics_fill_circle(ctx, center, shape_size);
+    graphics_draw_circle(ctx, center, shape_size);
+  } else if (five_minute == 2) {
+    int line_width = 15;
+    graphics_context_set_stroke_width(ctx, line_width);
+    graphics_context_set_stroke_color(ctx, background_color);
+    graphics_draw_circle(ctx, center, shape_size - line_width/2.0);
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_context_set_stroke_color(ctx, hour_line_color);
+    graphics_draw_circle(ctx, center, shape_size - line_width);
+    graphics_draw_circle(ctx, center, shape_size);
+  } else {
+    int angle_per_corner = TRIG_MAX_ANGLE / five_minute;
+    GPoint points[12];
+    for (int i = 0; i < five_minute; i++) {
+      points[i] = GPoint(
+        center.x + sin_lookup(angle_per_corner * i) * (shape_size) / TRIG_MAX_RATIO,
+        center.y - cos_lookup(angle_per_corner * i) * (shape_size) / TRIG_MAX_RATIO
+      );
+    }
+    GPathInfo pathInfo = {
+      .num_points = five_minute,
+      .points = points
+    };
+    if (filling_path != NULL) {
+      gpath_destroy(filling_path);
+    }
+    filling_path = gpath_create(&pathInfo);
+    gpath_draw_filled(ctx, filling_path);
+    gpath_draw_outline(ctx, filling_path);
+  }
+}
 
 static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
+
+    bitmap_layer = layer_create(bounds);
+  layer_set_update_proc(bitmap_layer, bitmap_layer_update_proc);
+  layer_add_child(window_layer, bitmap_layer);
 }
 
 static void prv_window_unload(Window *window) {
+  layer_destroy(bitmap_layer);
+}
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  int minute = (*tick_time).tm_min;
+  int hour = (*tick_time).tm_hour;
+  if ((minute + hour * 60) % 5 == 0) {
+    layer_mark_dirty(bitmap_layer);
+  }
 }
 
 static void prv_init(void) {
@@ -18,6 +120,7 @@ static void prv_init(void) {
   });
   const bool animated = true;
   window_stack_push(s_window, animated);
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 }
 
 static void prv_deinit(void) {
