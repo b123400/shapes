@@ -5,7 +5,8 @@
   "keywords": [
     "pebble-app"
   ],
-  "private": true,
+  "license": "MIT",
+  "private": false,
   "dependencies": {
     "pebble-clay": "^1.0.4"
   },
