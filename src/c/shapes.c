@@ -1,23 +1,43 @@
 #include <pebble.h>
 #include "SmallMaths.h"
 
+#define SETTINGS_KEY 1
+
 static Window *s_window;
 static Layer *bitmap_layer;
 
 static GColor background_color;
-static GColor hour_line_color;
+static GColor line_color;
+static bool swap_hour_min;
+static bool outline_shape;
+static int line_spacing;
+static int shape_size;
 static GPath *filling_path = NULL;
+
+typedef struct ClaySettings {
+  GColor BackgroundColor;
+  GColor LineColor;
+  bool SwapHourMin;
+  bool OutlineShape;
+  int LineSpacing;
+  int ShapeSize;
+} ClaySettings;
+
+static ClaySettings settings;
 
 static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
   int minute = (*t).tm_min;
-  int five_minute = (*t).tm_min / 5;
   int hour = (*t).tm_hour;
 
-  // temp
-  background_color = GColorFromRGBA(255, 255, 255, 255);
-  hour_line_color = GColorFromRGBA(205, 34, 49, 255);
+  if (swap_hour_min) {
+    int temp = hour;
+    hour = minute / 5;
+    minute = temp * 5;
+  }
+
+  int five_minute = (*t).tm_min / 5 + 1;
 
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
@@ -31,12 +51,10 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
   int32_t perpendicular = hour_angle + TRIG_MAX_RATIO / 4;
 
   graphics_context_set_stroke_width(ctx, 1);
-  graphics_context_set_stroke_color(ctx, hour_line_color);
+  graphics_context_set_stroke_color(ctx, line_color);
   graphics_context_set_antialiased(ctx, true);
 
-  int space = 5;
-
-  for (int shift = -diameter / 2; shift < diameter / 2; shift += space) {
+  for (int shift = -diameter / 2; shift < diameter / 2; shift += line_spacing) {
     int shiftX =   sin_lookup(perpendicular) * shift / TRIG_MAX_RATIO;
     int shiftY = - cos_lookup(perpendicular) * shift / TRIG_MAX_RATIO;
 
@@ -52,23 +70,24 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
     graphics_draw_line(ctx, diameterPoint1, diameterPoint2);
   }
 
-  five_minute = 2;
-  int shape_size = 30;
+  // five_minute = 2;
 
-  if (five_minute == 0) {
-    // draw nothing
-  } else if (five_minute == 1) {
+  if (five_minute == 1) {
     graphics_fill_circle(ctx, center, shape_size);
-    graphics_draw_circle(ctx, center, shape_size);
+    if (outline_shape) {
+      graphics_draw_circle(ctx, center, shape_size);
+    }
   } else if (five_minute == 2) {
     int line_width = 15;
     graphics_context_set_stroke_width(ctx, line_width);
     graphics_context_set_stroke_color(ctx, background_color);
     graphics_draw_circle(ctx, center, shape_size - line_width/2.0);
-    graphics_context_set_stroke_width(ctx, 1);
-    graphics_context_set_stroke_color(ctx, hour_line_color);
-    graphics_draw_circle(ctx, center, shape_size - line_width);
-    graphics_draw_circle(ctx, center, shape_size);
+    if (outline_shape) {
+      graphics_context_set_stroke_width(ctx, 1);
+      graphics_context_set_stroke_color(ctx, line_color);
+      graphics_draw_circle(ctx, center, shape_size - line_width);
+      graphics_draw_circle(ctx, center, shape_size);
+    }
   } else {
     int angle_per_corner = TRIG_MAX_ANGLE / five_minute;
     GPoint points[12];
@@ -87,7 +106,9 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
     }
     filling_path = gpath_create(&pathInfo);
     gpath_draw_filled(ctx, filling_path);
-    gpath_draw_outline(ctx, filling_path);
+    if (outline_shape) {
+      gpath_draw_outline(ctx, filling_path);
+    }
   }
 }
 
@@ -112,7 +133,66 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 }
 
+static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) {
+  // Read color preferences
+  Tuple *bg_color_t = dict_find(iter, MESSAGE_KEY_background_color);
+  if(bg_color_t) {
+    background_color = GColorFromHEX(bg_color_t->value->int32);
+  }
+  Tuple *line_color_t = dict_find(iter, MESSAGE_KEY_line_color);
+  if(line_color_t) {
+    line_color = GColorFromHEX(line_color_t->value->int32);
+  }
+  Tuple *swap_hour_min_t = dict_find(iter, MESSAGE_KEY_swap_hour_min);
+  if (swap_hour_min_t) {
+    swap_hour_min = swap_hour_min_t->value->uint8 != 0;
+  }
+  Tuple *outline_shape_t = dict_find(iter, MESSAGE_KEY_outline_shape);
+  if (outline_shape_t) {
+    outline_shape = outline_shape_t->value->uint8 != 0;
+  }
+  Tuple *line_spacing_t = dict_find(iter, MESSAGE_KEY_line_spacing);
+  if (line_spacing_t) {
+    line_spacing = line_spacing_t->value->int32;
+  }
+  Tuple *shape_size_t = dict_find(iter, MESSAGE_KEY_shape_size);
+  if (shape_size_t) {
+    shape_size = shape_size_t->value->int32;
+  }
+
+  layer_mark_dirty(bitmap_layer);
+
+  settings.BackgroundColor = background_color;
+  settings.LineColor = line_color;
+  settings.SwapHourMin = swap_hour_min;
+  settings.OutlineShape = outline_shape;
+  settings.LineSpacing = line_spacing;
+  settings.ShapeSize = shape_size;
+
+  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
 static void prv_init(void) {
+    // default settings
+  settings.BackgroundColor = GColorWhite;
+  settings.LineColor = GColorFromRGBA(205, 34, 49, 255);
+  settings.SwapHourMin = false;
+  settings.OutlineShape = false;
+  settings.LineSpacing = 5;
+  settings.ShapeSize = 30;
+
+  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+  // apply saved data
+  background_color = settings.BackgroundColor;
+  line_color = settings.LineColor;
+  swap_hour_min = settings.SwapHourMin;
+  outline_shape = settings.OutlineShape;
+  line_spacing = settings.LineSpacing;
+  shape_size = settings.ShapeSize;
+
+  app_message_register_inbox_received(prv_inbox_received_handler);
+  app_message_open(128, 128);
+
   s_window = window_create();
   window_set_window_handlers(s_window, (WindowHandlers) {
     .load = prv_window_load,

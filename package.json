@@ -1,10 +1,14 @@
 {
   "name": "shapes",
-  "author": "MakeAwesomeHappen",
+  "author": "b123400",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
   "pebble": {
     "displayName": "shapes",
     "uuid": "d87fe5b0-0354-4003-adab-6e5d8a7e064a",
@@ -20,7 +24,12 @@
       "watchface": true
     },
     "messageKeys": [
-      "dummy"
+      "background_color",
+      "line_color",
+      "swap_hour_min",
+      "outline_shape",
+      "line_spacing",
+      "shape_size"
     ],
     "resources": {
       "media": []

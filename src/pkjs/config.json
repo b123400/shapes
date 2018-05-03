@@ -1,0 +1,57 @@
+[
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "🤘🤘🤘🤘"
+      },
+      {
+        "type": "color",
+        "messageKey": "background_color",
+        "defaultValue": "FFFFFF",
+        "label": "Background Color",
+        "allowGray": true
+      },
+      {
+        "type": "color",
+        "messageKey": "line_color",
+        "defaultValue": "ff1111",
+        "label": "Filled Color",
+        "allowGray": true
+      },
+      {
+        "type": "toggle",
+        "messageKey": "swap_hour_min",
+        "defaultValue": false,
+        "label": "Swap hour/min"
+      },
+      {
+        "type": "toggle",
+        "messageKey": "outline_shape",
+        "defaultValue": false,
+        "label": "Outline Shape"
+      },
+      {
+        "type": "slider",
+        "messageKey": "line_spacing",
+        "defaultValue": 5,
+        "min": 5,
+        "max": 20,
+        "label": "BG line spacing"
+      },
+      {
+        "type": "slider",
+        "messageKey": "shape_size",
+        "defaultValue": 30,
+        "min": 20,
+        "max": 80,
+        "label": "Shape size"
+      },
+      {
+        "type": "submit",
+        "defaultValue": "Save"
+      }
+    ]
+  }
+]
