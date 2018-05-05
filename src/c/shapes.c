@@ -37,7 +37,7 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
     minute = temp * 5;
   }
 
-  int five_minute = (*t).tm_min / 5 + 1;
+  int five_minute = minute / 5;
 
   GRect bounds = layer_get_bounds(layer);
   GPoint center = grect_center_point(&bounds);
