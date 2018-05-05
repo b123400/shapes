@@ -70,9 +70,9 @@ static void bitmap_layer_update_proc(Layer *layer, GContext* ctx) {
     graphics_draw_line(ctx, diameterPoint1, diameterPoint2);
   }
 
-  // five_minute = 2;
-
-  if (five_minute == 1) {
+  if (five_minute == 0) {
+    // no drawing
+  } else if (five_minute == 1) {
     graphics_fill_circle(ctx, center, shape_size);
     if (outline_shape) {
       graphics_draw_circle(ctx, center, shape_size);
