@@ -123,6 +123,9 @@ static void prv_window_load(Window *window) {
 
 static void prv_window_unload(Window *window) {
   layer_destroy(bitmap_layer);
+  if (filling_path != NULL) {
+    gpath_destroy(filling_path);
+  }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
